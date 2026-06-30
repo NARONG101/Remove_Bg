@@ -1,6 +1,3 @@
-// Backend URL - Set this to your hosted backend (e.g., Render, Vercel, etc.)
-const BACKEND_URL = 'http://127.0.0.1:5000'; // Change this to your hosted backend!
-
 const themeToggle = document.getElementById('themeToggle');
 const body = document.body;
 const uploadArea = document.getElementById('uploadArea');
@@ -688,35 +685,44 @@ async function applyBackgroundClientSide() {
     }
 }
 
-// Auto-detect background color button
+// Auto-detect background color button (client-side)
 const autoDetectBtn = document.getElementById('autoDetectColor');
 if (autoDetectBtn && selectedFiles.length > 0) {
     autoDetectBtn.addEventListener('click', async () => {
         try {
-            const formData = new FormData();
-            formData.append('image', selectedFiles[0]);
+            const file = selectedFiles[0];
+            const img = new Image();
+            const url = URL.createObjectURL(file);
             
-            const backendUrl = `${BACKEND_URL}/detect-background-color`;
-            const response = await fetch(backendUrl, {
-                method: 'POST',
-                body: formData
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = url;
             });
+
+            const canvas = document.createElement('canvas');
+            const ctx = canvas.getContext('2d');
+            const sampleSize = 50;
+            canvas.width = sampleSize;
+            canvas.height = sampleSize;
+            ctx.drawImage(img, 0, 0, sampleSize, sampleSize);
             
-            if (!response.ok) {
-                throw new Error('Failed to detect background color');
+            const imageData = ctx.getImageData(0, 0, sampleSize, sampleSize).data;
+            const pixels = [];
+            for (let i = 0; i < imageData.length; i += 4) {
+                pixels.push([imageData[i], imageData[i+1], imageData[i+2]]);
             }
             
-            const result = await response.json();
-            if (result.success) {
-                bgColorInput.value = result.color;
-                colorPresets.forEach(p => p.classList.remove('selected'));
-                showStatus(`Detected background color: ${result.color}`, 'success');
-                
-                // Apply the detected color if we have a processed image
-                if (transparentBlob && selectedFiles.length > 0) {
-                    applyBackgroundClientSide();
-                }
-            }
+            const avgR = Math.round(pixels.reduce((sum, p) => sum + p[0], 0) / pixels.length);
+            const avgG = Math.round(pixels.reduce((sum, p) => sum + p[1], 0) / pixels.length);
+            const avgB = Math.round(pixels.reduce((sum, p) => sum + p[2], 0) / pixels.length);
+            
+            const hexColor = '#' + [avgR, avgG, avgB].map(x => x.toString(16).padStart(2, '0')).join('');
+            bgColorInput.value = hexColor;
+            colorPresets.forEach(p => p.classList.remove('selected'));
+            showStatus(`Detected background color: ${hexColor}`, 'success');
+            
+            URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error detecting background color:', error);
             showStatus('Failed to detect background color', 'error');
@@ -828,46 +834,6 @@ function handleFiles(files) {
         result.style.display = 'none'; // Hide previous result
         status.textContent = '';
         status.className = 'status';
-        
-        // Re-bind auto-detect button event listener now that we have a file
-        const autoDetectBtn = document.getElementById('autoDetectColor');
-        if (autoDetectBtn) {
-            // Remove existing listeners (if any) by cloning
-            const newBtn = autoDetectBtn.cloneNode(true);
-            autoDetectBtn.parentNode.replaceChild(newBtn, autoDetectBtn);
-            
-            newBtn.addEventListener('click', async () => {
-                try {
-                    const formData = new FormData();
-                    formData.append('image', selectedFiles[0]);
-                    
-                     const backendUrl = `${BACKEND_URL}/detect-background-color`;
-                     const response = await fetch(backendUrl, {
-                         method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (!response.ok) {
-                        throw new Error('Failed to detect background color');
-                    }
-                    
-                    const result = await response.json();
-                    if (result.success) {
-                        bgColorInput.value = result.color;
-                        colorPresets.forEach(p => p.classList.remove('selected'));
-                        showStatus(`Detected background color: ${result.color}`, 'success');
-                        
-                        // Apply the detected color if we have a processed image
-                        if (transparentBlob && selectedFiles.length > 0) {
-                            applyBackgroundClientSide();
-                        }
-                    }
-                } catch (error) {
-                    console.error('Error detecting background color:', error);
-                    showStatus('Failed to detect background color', 'error');
-                }
-            });
-        }
     } else {
         showStatus('Please select valid image files.', 'error');
     }
@@ -894,142 +860,50 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
     e.preventDefault();
     
     try {
-        const formData = new FormData(this);
-
-        // Append options to formData
-        const maxSize = document.getElementById('max_size')?.value || '0';
-        const quality = document.getElementById('quality')?.value || '95';
-        
-        formData.append('max_size', maxSize);
-        formData.append('quality', quality);
-        
-        // Auto-detect best settings
-        formData.append('model', 'u2net_human_seg'); // Specifically trained for human portraits!
-        formData.append('format', 'png'); // PNG default for transparency
-        
-        const bgTypeInput = document.querySelector('input[name="background_type"]:checked');
-        const bgType = bgTypeInput ? bgTypeInput.value : 'transparent';
-        formData.append('background_type', bgType);
-        
-        const bgColorInputEl = document.getElementById('bgColor');
-        formData.append('bg_color', bgColorInputEl ? bgColorInputEl.value : '#ffffff');
-        
-        // Add advanced settings (if they exist)
-        const superPrecisionEl = document.getElementById('super_precision');
-        if (superPrecisionEl) {
-            formData.append('super_precision', superPrecisionEl.checked);
+        const file = selectedFiles[0];
+        if (!file) {
+            showStatus('Please select an image first.', 'error');
+            return;
         }
 
-        const edgeCleaningEl = document.getElementById('edge_cleaning');
-        if (edgeCleaningEl) {
-            formData.append('edge_cleaning', edgeCleaningEl.value);
-        }
-
-        const enhanceBgEl = document.getElementById('enhance_bg');
-        if (enhanceBgEl) {
-            formData.append('enhance_bg', enhanceBgEl.checked);
-        }
-
-        const alphaMattingEl = document.getElementById('alpha_matting');
-        if (alphaMattingEl) {
-            formData.append('alpha_matting', alphaMattingEl.checked);
-            formData.append('alpha_matting_foreground_threshold', document.getElementById('af_threshold')?.value || '240');
-            formData.append('alpha_matting_background_threshold', document.getElementById('ab_threshold')?.value || '10');
-            formData.append('alpha_matting_erode_size', document.getElementById('ae_size')?.value || '10');
-        }
-
-        const bgImageFile = document.getElementById('bgImage')?.files[0];
-        if (bgImageFile) {
-            formData.append('bg_image', bgImageFile);
-        }
-
-        // Get current settings
-        currentFormat = 'png'; 
-        currentQuality = parseInt(quality);
-
-        // Show loading
         loading.style.display = 'block';
         submitBtn.disabled = true;
-        submitBtn.innerHTML = '<span class="btn-icon">⏳</span> Working Magic...';
+        submitBtn.innerHTML = '<span class="btn-icon">⏳</span> Processing with AI...';
         status.textContent = '';
         status.className = 'status';
 
-        // Use absolute URL if on a different port (e.g., Live Server)
-        const backendUrl = `${BACKEND_URL}/upload`;
-
-        const response = await fetch(backendUrl, {
-            method: 'POST',
-            body: formData
+        const blob = await window.clientSideRemove(file, {
+            output: {
+                format: 'image/png',
+                quality: 0.8
+            },
+            progress: (key, current, total) => {
+                const percent = Math.round((current / total) * 100);
+                status.textContent = `Loading AI model... ${percent}%`;
+            }
         });
 
         loading.style.display = 'none';
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span class="btn-icon">✨</span> Magic Remove Background';
+        submitBtn.innerHTML = '<span class="btn-icon">✨</span> Remove Background';
 
-        if (!response.ok) {
-            const data = await response.json().catch(() => ({ error: 'Server error occurred' }));
-            throw new Error(data.error || 'Upload failed. Please try again.');
-        }
+        transparentBlob = blob;
+        processedBlob = blob;
 
-        const contentType = response.headers.get('content-type');
-        const blob = await response.blob();
-        
-        if (contentType && contentType.includes('application/zip')) {
-            // Batch processing result (ZIP)
-            resultTitle.textContent = `Processed ${selectedFiles.length} Images Successfully`;
-            resultImg.style.display = 'none';
-            
-            // Create a temporary link to download the ZIP
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = 'processed_images.zip';
-            document.body.appendChild(a);
-            a.click();
-            a.remove();
-            
-            showStatus(`✅ All ${selectedFiles.length} images processed! ZIP downloaded.`, 'success');
-        } else {
-            // Single file result
-            transparentBlob = blob; // Store transparent PNG
-            processedBlob = blob; // Initially same
+        resultTitle.textContent = 'Your Background-Removed Image';
+        const url = URL.createObjectURL(blob);
+        resultImg.src = url;
+        resultImg.style.display = 'block';
+        refineBtn.style.display = 'inline-block';
 
-            resultTitle.textContent = 'Your Background-Removed Image';
-            const url = URL.createObjectURL(blob);
-            resultImg.src = url;
-            resultImg.style.display = 'block';
-            refineBtn.style.display = 'inline-block';
-
-            // Clear existing toggle if any
-            const resultContainer = document.querySelector('.result-container');
-            const existingToggle = resultContainer.querySelector('.comparison-toggle');
-            if (existingToggle) existingToggle.remove();
-
-            // Add Before/After toggle for single images
-            if (selectedFiles.length === 1) {
-                const reader = new FileReader();
-                reader.onload = function(e) {
-                    addComparisonToggle(resultContainer, e.target.result, url);
-                };
-                reader.readAsDataURL(selectedFiles[0]);
-            }
-
-            // Apply background if not transparent and enhancement is NOT active
-            // If enhancement is active, the server already returned the full enhanced image
-            const enhanceBgChecked = document.getElementById('enhance_bg')?.checked;
-            if (bgType !== 'transparent' && !enhanceBgChecked) {
-                applyBackgroundClientSide();
-            }
-            showStatus('Your background-removed image is ready!', 'success');
-        }
-        
         result.style.display = 'block';
         result.scrollIntoView({ behavior: 'smooth' });
+        showStatus('Your background-removed image is ready!', 'success');
     } catch (error) {
         console.error('Error processing image:', error);
         loading.style.display = 'none';
         submitBtn.disabled = false;
-        submitBtn.innerHTML = '<span class="btn-icon">✨</span> Magic Remove Background';
+        submitBtn.innerHTML = '<span class="btn-icon">✨</span> Remove Background';
         showStatus('Error: ' + error.message, 'error');
     }
 });
