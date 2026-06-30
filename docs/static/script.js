@@ -1,5 +1,5 @@
 // Backend URL - Set this to your hosted backend (e.g., Render, Vercel, etc.)
-const BACKEND_URL = 'https://narong101.github.io/Remove_Bg/'; // Change this to your hosted backend!
+const BACKEND_URL = 'https://my-remove-bg.onrender.com'; // Change this to your hosted backend!
 
 const themeToggle = document.getElementById('themeToggle');
 const body = document.body;
