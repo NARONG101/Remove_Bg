@@ -1,3 +1,6 @@
+// Backend URL - Set this to your hosted backend (e.g., Render, Vercel, etc.)
+const BACKEND_URL = 'http://127.0.0.1:5000'; // Change this to your hosted backend!
+
 const themeToggle = document.getElementById('themeToggle');
 const body = document.body;
 const uploadArea = document.getElementById('uploadArea');
@@ -693,7 +696,7 @@ if (autoDetectBtn && selectedFiles.length > 0) {
             const formData = new FormData();
             formData.append('image', selectedFiles[0]);
             
-            const backendUrl = window.location.port === '5500' ? 'http://127.0.0.1:5000/detect-background-color' : '/detect-background-color';
+            const backendUrl = `${BACKEND_URL}/detect-background-color`;
             const response = await fetch(backendUrl, {
                 method: 'POST',
                 body: formData
@@ -838,9 +841,9 @@ function handleFiles(files) {
                     const formData = new FormData();
                     formData.append('image', selectedFiles[0]);
                     
-                    const backendUrl = window.location.port === '5500' ? 'http://127.0.0.1:5000/detect-background-color' : '/detect-background-color';
-                    const response = await fetch(backendUrl, {
-                        method: 'POST',
+                     const backendUrl = `${BACKEND_URL}/detect-background-color`;
+                     const response = await fetch(backendUrl, {
+                         method: 'POST',
                         body: formData
                     });
                     
@@ -952,7 +955,7 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         status.className = 'status';
 
         // Use absolute URL if on a different port (e.g., Live Server)
-        const backendUrl = window.location.port === '5500' ? 'http://127.0.0.1:5000/upload' : '/upload';
+        const backendUrl = `${BACKEND_URL}/upload`;
 
         const response = await fetch(backendUrl, {
             method: 'POST',

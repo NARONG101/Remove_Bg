@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: remove-bg-api
+    runtime: python
+    plan: free
+    buildCommand: pip install -r backend/requirements.txt
+    startCommand: python backend/app.py

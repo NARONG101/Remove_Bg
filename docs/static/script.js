@@ -841,9 +841,9 @@ function handleFiles(files) {
                     const formData = new FormData();
                     formData.append('image', selectedFiles[0]);
                     
-                    const backendUrl = `${BACKEND_URL}/detect-background-color`;
-                    const response = await fetch(backendUrl, {
-                        method: 'POST',
+                     const backendUrl = `${BACKEND_URL}/detect-background-color`;
+                     const response = await fetch(backendUrl, {
+                         method: 'POST',
                         body: formData
                     });
                     
