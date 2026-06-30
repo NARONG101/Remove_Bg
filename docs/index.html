@@ -6,8 +6,13 @@
     <title>Magic Background Remover</title>
     <link rel="stylesheet" href="./static/styles.css">
     <script type="module">
-        import { removeBackground } from 'https://esm.sh/@imgly/background-removal@1.5.5';
-        window.clientSideRemove = removeBackground;
+        try {
+            const module = await import('https://esm.sh/@imgly/background-removal@1.5.5');
+            window.clientSideRemove = module.removeBackground;
+        } catch (err) {
+            console.error('Failed to load AI model:', err);
+            window.clientSideRemove = null;
+        }
     </script>
 </head>
 <body>

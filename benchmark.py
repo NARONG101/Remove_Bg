@@ -5,7 +5,6 @@ import cv2
 import numpy as np
 from PIL import Image
 from rembg import remove, new_session
-import requests
 
 def get_metrics(pil_image):
     """Calculates metrics for a background-removed image (RGBA)."""

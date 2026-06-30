@@ -872,6 +872,14 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         status.textContent = '';
         status.className = 'status';
 
+        if (typeof window.clientSideRemove !== 'function') {
+            loading.style.display = 'none';
+            submitBtn.disabled = false;
+            submitBtn.innerHTML = '<span class="btn-icon">✨</span> Remove Background';
+            showStatus('AI model is still loading or failed to load. Please refresh the page and try again.', 'error');
+            return;
+        }
+
         const blob = await window.clientSideRemove(file, {
             output: {
                 format: 'image/png',
