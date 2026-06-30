@@ -28,6 +28,10 @@ jobs:
           cp backend/templates/index.html docs/index.html
           cp -r backend/static/* docs/static/
 
+      - name: Fix asset paths for GitHub Pages
+        run: |
+          sed -i 's|/static/|./static/|g' docs/index.html
+
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
