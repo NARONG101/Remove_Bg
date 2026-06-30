@@ -1,3 +1,6 @@
+// Backend URL - After deploying on Render, replace with your Render URL
+const BACKEND_URL = ''; // e.g. 'https://your-app.onrender.com'
+
 const themeToggle = document.getElementById('themeToggle');
 const body = document.body;
 const uploadArea = document.getElementById('uploadArea');

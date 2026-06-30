@@ -4,4 +4,7 @@ services:
     runtime: python
     plan: free
     buildCommand: pip install -r backend/requirements.txt
-    startCommand: python backend/app.py
+    startCommand: cd backend && python app.py
+    envVars:
+      - key: PORT
+        value: 10000
