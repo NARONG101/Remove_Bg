@@ -21,10 +21,58 @@ def get_session(model_name):
         sessions[model_name] = new_session(model_name)
     return sessions[model_name]
 
-def refine_mask(pil_image, min_area=100, edge_cleaning_intensity=1.0):
+def detect_background_color(pil_image):
     """
-    Advanced refinement using Bilateral Filtering, Edge Decontamination, 
-    and precise morphological operations to fix haloing and color bleeding.
+    Detect the dominant background color from the original image
+    by analyzing the corners and edges of the image.
+    """
+    # Convert PIL to OpenCV (RGB)
+    cv_image = cv2.cvtColor(np.array(pil_image.convert('RGB')), cv2.COLOR_RGB2BGR)
+    height, width = cv_image.shape[:2]
+    
+    # Define regions to sample (corners and edges)
+    regions = []
+    # Top-left corner
+    regions.append(cv_image[0:height//4, 0:width//4])
+    # Top-right corner
+    regions.append(cv_image[0:height//4, width*3//4:width])
+    # Bottom-left corner
+    regions.append(cv_image[height*3//4:height, 0:width//4])
+    # Bottom-right corner
+    regions.append(cv_image[height*3//4:height, width*3//4:width])
+    # Top edge
+    regions.append(cv_image[0:height//10, 0:width])
+    # Bottom edge
+    regions.append(cv_image[height*9//10:height, 0:width])
+    # Left edge
+    regions.append(cv_image[0:height, 0:width//10])
+    # Right edge
+    regions.append(cv_image[0:height, width*9//10:width])
+    
+    # Combine all regions
+    sampled_pixels = np.vstack([region.reshape(-1, 3) for region in regions])
+    
+    # Try simple methods first (median and mean) since they're fast
+    try:
+        # Try median first - robust to outliers
+        dominant_color_bgr = np.median(sampled_pixels, axis=0)
+    except Exception:
+        # Fallback to mean
+        dominant_color_bgr = np.mean(sampled_pixels, axis=0)
+    
+    # Convert BGR to RGB then to hex
+    dominant_color_rgb = dominant_color_bgr.astype(int)[::-1]
+    hex_color = '#{:02x}{:02x}{:02x}'.format(
+        max(0, min(255, dominant_color_rgb[0])),
+        max(0, min(255, dominant_color_rgb[1])),
+        max(0, min(255, dominant_color_rgb[2]))
+    )
+    
+    return hex_color
+
+def refine_mask(pil_image, min_area=50, edge_cleaning_intensity=1.0):
+    """
+    Minimal refinement - just clean up tiny noise, preserve original mask quality!
     """
     # Convert PIL to OpenCV (RGBA)
     cv_image = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGBA2BGRA)
@@ -32,72 +80,19 @@ def refine_mask(pil_image, min_area=100, edge_cleaning_intensity=1.0):
     # Extract channels
     b, g, r, alpha = cv2.split(cv_image)
     
-    # 1. Edge Decontamination (Remove color bleeding from original background)
-    # Find the transition area (edges)
-    edge_mask = cv2.threshold(alpha, 0, 255, cv2.THRESH_BINARY)[1]
-    # Dilate edges slightly to find "bleeding" areas
-    kernel_edge = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-    alpha_eroded = cv2.erode(alpha, kernel_edge, iterations=1)
-    
-    # Create a mask of semi-transparent pixels
-    semi_transparent = cv2.bitwise_and(cv2.threshold(alpha, 1, 255, cv2.THRESH_BINARY)[1], 
-                                     cv2.threshold(alpha, 250, 255, cv2.THRESH_BINARY_INV)[1])
-    
-    if np.any(semi_transparent):
-        # Use Inpainting or simple color expansion to fix edge colors
-        # For simplicity and speed, we'll use a slightly eroded version of the image 
-        # to fill color into the semi-transparent edges
-        mask_for_fix = cv2.threshold(alpha, 200, 255, cv2.THRESH_BINARY)[1]
-        
-        # Simple decontamination: replace edge colors with interior colors
-        # We'll use a median blur on the color channels only where alpha is low
-        # but only in the transition regions
-        temp_img = cv_image[:, :, :3].copy()
-        decontaminated = cv2.medianBlur(temp_img, 5)
-        
-        # Blend original and decontaminated based on alpha
-        # Lower alpha = more decontamination
-        for i in range(3):
-            cv_image[:, :, i] = np.where(alpha < 200, decontaminated[:, :, i], cv_image[:, :, i])
-
-    # 2. Alpha Channel Refinement
-    # Bilateral Filter on alpha to smooth noise while keeping edges sharp
-    alpha_smooth = cv2.bilateralFilter(alpha, 9, 75, 75)
-    
-    # 3. Morphological Operations to clean up
-    # Slightly erode to remove the outermost halo pixels if intensity is high
-    if edge_cleaning_intensity > 0:
-        kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (3, 3))
-        # Use a soft erosion (weighted blend) to avoid harsh jagged edges
-        eroded = cv2.erode(alpha_smooth, kernel, iterations=1)
-        
-        # Ensure intensity is within safe bounds [0, 3.33] to keep weights positive
-        safe_intensity = max(0.0, min(edge_cleaning_intensity, 3.0))
-        weight_eroded = 0.3 * safe_intensity
-        weight_orig = 1.0 - weight_eroded
-        
-        alpha_smooth = cv2.addWeighted(alpha_smooth, weight_orig, 
-                                      eroded, weight_eroded, 0)
-    
-    # 4. Remove small background "points" (noise)
-    _, binary = cv2.threshold(alpha_smooth, 10, 255, cv2.THRESH_BINARY)
+    # Keep original alpha channel - only remove very small specks
+    _, binary = cv2.threshold(alpha, 1, 255, cv2.THRESH_BINARY)
     num_labels, labels, stats, _ = cv2.connectedComponentsWithStats(binary, connectivity=8)
-    new_mask = np.zeros_like(alpha_smooth)
+    new_mask = np.zeros_like(alpha)
+    
     for i in range(1, num_labels):
-        if stats[i, cv2.CC_STAT_AREA] >= min_area:
+        if stats[i, cv2.CC_STAT_AREA] >= 10:  # Keep everything except tiny specks
             new_mask[labels == i] = 255
-            
-    # 5. Final Edge Softening & Cleanup
-    # Combine original smooth alpha with cleaned mask
-    final_alpha = cv2.bitwise_and(alpha_smooth, new_mask)
     
-    # Apply a final slight blur to edges only
-    final_alpha = cv2.GaussianBlur(final_alpha, (3, 3), 0)
+    final_alpha = cv2.bitwise_and(alpha, new_mask)
     
-    # Update alpha channel
+    # That's it! No extra processing - keep the original model's sharp output
     cv_image[:, :, 3] = final_alpha
-    
-    # Convert back to PIL
     return Image.fromarray(cv2.cvtColor(cv_image, cv2.COLOR_BGRA2RGBA))
 
 def enhance_background_logic(original_pil, mask_pil):
@@ -188,10 +183,9 @@ def upload():
         return jsonify({'error': 'No files selected'}), 400
 
     # Get processing options
-    # Auto-select best model if not provided
-    model_name = request.form.get('model', 'isnet-general-use')
+    model_name = request.form.get('model', 'u2net_human_seg')
     if model_name == 'undefined' or not model_name:
-        model_name = 'isnet-general-use'
+        model_name = 'u2net_human_seg'
         
     super_precision = request.form.get('super_precision') == 'true'
     enhance_bg = request.form.get('enhance_bg') == 'true'
@@ -201,13 +195,8 @@ def upload():
     ab_threshold = int(request.form.get('alpha_matting_background_threshold', 10))
     ae_size = int(request.form.get('alpha_matting_erode_size', 10))
     
-    quality = int(request.form.get('quality', 95))
+    quality = int(request.form.get('quality', 100))
     output_format = request.form.get('format', 'png').lower()
-    
-    # Auto-detect format from first file if format is not explicitly set or is 'auto'
-    if (output_format == 'undefined' or output_format == 'png') and len(files) > 0:
-        # Default to PNG for transparency, but we can check the input file
-        pass 
 
     max_size = int(request.form.get('max_size', 0))
     background_type = request.form.get('background_type', 'transparent')
@@ -220,7 +209,7 @@ def upload():
         session = get_session(model_name)
     except Exception as e:
         logger.error(f'Error creating session for model {model_name}: {str(e)}')
-        session = None # Fallback to default in remove()
+        session = None
 
     for file in files:
         if file.filename == '' or not allowed_file(file.filename):
@@ -236,46 +225,56 @@ def upload():
         try:
             input_image = file.read()
             
-            # Use specified model and alpha matting settings
+            # FIRST: Get the ORIGINAL input size and keep track of it to enforce at end!
+            orig_input_pil = Image.open(io.BytesIO(input_image))
+            orig_w, orig_h = orig_input_pil.size
+            orig_size = (orig_w, orig_h)
+            
+            # Use human-specific model with optimized alpha matting
             output_image = remove(
                 input_image, 
                 session=session,
-                alpha_matting=alpha_matting,
-                alpha_matting_foreground_threshold=af_threshold,
-                alpha_matting_background_threshold=ab_threshold,
-                alpha_matting_erode_size=ae_size
+                alpha_matting=True,
+                alpha_matting_foreground_threshold=254,  # Very strict on foreground
+                alpha_matting_background_threshold=1,     # Very strict on background
+                alpha_matting_erode_size=5                # Less erosion
             )
 
             # Convert to PIL Image
             pil_image = Image.open(io.BytesIO(output_image))
 
-            # Apply Super Precision Refinement if requested
+            # Always apply refinement to remove halos/shadows
+            pil_image = refine_mask(pil_image, edge_cleaning_intensity=1.0)
+
+            # Apply additional Super Precision Refinement if requested
             if super_precision:
                 pil_image = refine_mask(pil_image, edge_cleaning_intensity=edge_cleaning)
 
-            # Resize if max_size is specified
-            if max_size > 0 and max_size < max(pil_image.size):
-                pil_image.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+            # ONLY resize if user explicitly selected a max size (1920/1280/800),
+            # keep original size otherwise!
+            target_size = orig_size
+            if max_size > 0 and max_size < max(target_size):
+                # Use LANCZOS for high quality downscaling
+                temp_img = orig_input_pil.copy()
+                temp_img.thumbnail((max_size, max_size), Image.Resampling.LANCZOS)
+                target_size = temp_img.size
+
+            # Make sure the processed image has EXACTLY the correct target size!
+            if pil_image.size != target_size:
+                pil_image = pil_image.resize(target_size, Image.Resampling.LANCZOS)
 
             # Apply Background Enhancement if requested
-            # This must happen after resizing to maintain consistency
             if enhance_bg:
-                # We need the original image at the same size as pil_image
-                orig_pil = Image.open(io.BytesIO(input_image))
-                orig_pil = orig_pil.resize(pil_image.size, Image.Resampling.LANCZOS)
-                # Enhance background using the mask from rembg
+                orig_pil = orig_input_pil.resize(target_size, Image.Resampling.LANCZOS)
                 pil_image = enhance_background_logic(orig_pil, pil_image)
 
             # For single file, handle return
             if len(files) == 1:
-                # If we enhanced the background, we return the full image (RGB/RGBA)
-                # If not, we return transparent PNG for client-side processing
                 if not enhance_bg:
                     if pil_image.mode != 'RGBA':
                         pil_image = pil_image.convert('RGBA')
                 
                 output_buffer = io.BytesIO()
-                # Determine format
                 save_format = 'PNG'
                 if output_format == 'jpg': save_format = 'JPEG'
                 elif output_format == 'webp': save_format = 'WebP'
@@ -287,17 +286,18 @@ def upload():
                     output_buffer,
                     mimetype=f'image/{output_format}',
                     as_attachment=False,
-                    download_name=os.path.splitext(file.filename)[0] + f'_enhanced.{output_format}'
+                    download_name=os.path.splitext(file.filename)[0] + f'_bg_removed.{output_format}'
                 )
             else:
                 # Multiple files - apply background server-side
                 format_type = get_format_from_filename(file.filename)
 
                 # Apply background replacement
-                if background_type == 'color':
-                    color = tuple(int(bg_color[i:i+2], 16) for i in (1, 3, 5))
+                if background_type == 'color' or background_type == 'white':
+                    color = '#ffffff' if background_type == 'white' else bg_color
+                    color_tuple = tuple(int(color[i:i+2], 16) for i in (1, 3, 5))
                     if pil_image.mode == 'RGBA':
-                        background = Image.new('RGBA' if format_type == 'png' else 'RGB', pil_image.size, color)
+                        background = Image.new('RGBA' if format_type == 'png' else 'RGB', pil_image.size, color_tuple)
                         background.paste(pil_image, mask=pil_image.split()[-1])
                         pil_image = background
                     if format_type in ['jpg', 'jpeg']:
@@ -319,16 +319,16 @@ def upload():
                 pil_image.save(output_buffer, format=save_format, quality=quality)
                 output_buffer.seek(0)
                 processed_files.append((
-                    os.path.splitext(file.filename)[0] + f'_removed.{format_type}',
+                    os.path.splitext(file.filename)[0] + f'_bg_removed.{format_type}',
                     output_buffer.getvalue()
                 ))
 
         except Exception as e:
-            logger.error(f'Error processing file {file.filename}: {str(e)}')
+            logger.error(f'Error processing file {file.filename}: {str(e)}', exc_info=True)
             continue
 
     if not processed_files:
-        return jsonify({'error': 'No files could be processed'}), 500
+        return jsonify({'error': 'No files could be processed. Please check your images and try again.'}), 500
 
     # Create ZIP for multiple files
     memory_file = io.BytesIO()
@@ -343,6 +343,27 @@ def upload():
         as_attachment=True,
         download_name='processed_images.zip'
     )
+
+@app.route('/detect-background-color', methods=['POST'])
+def detect_background_color_endpoint():
+    try:
+        if 'image' not in request.files:
+            return jsonify({'error': 'No image file provided'}), 400
+        
+        file = request.files['image']
+        if file.filename == '':
+            return jsonify({'error': 'No file selected'}), 400
+        
+        # Open the image
+        pil_image = Image.open(io.BytesIO(file.read()))
+        
+        # Detect background color
+        hex_color = detect_background_color(pil_image)
+        
+        return jsonify({'success': True, 'color': hex_color})
+    except Exception as e:
+        logger.error(f'Error detecting background color: {str(e)}', exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/refine', methods=['POST'])
 def refine():
@@ -360,4 +381,4 @@ def refine():
         return jsonify({'error': str(e)}), 500
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, host='0.0.0.0', port=5000)

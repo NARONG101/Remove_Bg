@@ -2,6 +2,7 @@ const themeToggle = document.getElementById('themeToggle');
 const body = document.body;
 const uploadArea = document.getElementById('uploadArea');
 const fileInput = document.getElementById('fileInput');
+const primaryUploadBtn = document.getElementById('primaryUploadBtn');
 const pasteBtn = document.getElementById('pasteBtn');
 const fileCount = document.getElementById('fileCount');
 const preview = document.getElementById('preview');
@@ -14,23 +15,15 @@ const resultImg = document.getElementById('resultImg');
 const downloadBtn = document.getElementById('downloadBtn');
 const status = document.getElementById('status');
 
-// Advanced Settings Elements
-const toggleAdvanced = document.getElementById('toggle-advanced');
-const advancedSettings = document.getElementById('advanced-settings');
-const rangeInputs = document.querySelectorAll('input[type="range"]');
-
-// Toggle Advanced Settings
-if (toggleAdvanced && advancedSettings) {
-    toggleAdvanced.addEventListener('click', () => {
-        advancedSettings.classList.toggle('active');
-        const isExpanded = advancedSettings.classList.contains('active');
-        toggleAdvanced.innerHTML = isExpanded 
-            ? '<span class="icon">✖</span> Close Edge Refinement'
-            : '<span class="icon">⚙️</span> Advanced Edge Refinement';
+// Click primary upload button to open file picker
+if (primaryUploadBtn) {
+    primaryUploadBtn.addEventListener('click', () => {
+        fileInput.click();
     });
 }
 
 // Update Range Values
+const rangeInputs = document.querySelectorAll('input[type="range"]');
 rangeInputs.forEach(input => {
     input.addEventListener('input', (e) => {
         const valueSpan = e.target.nextElementSibling;
@@ -39,34 +32,11 @@ rangeInputs.forEach(input => {
         }
     });
 });
-
-// Background Blur Elements
-const bgBlurControl = document.createElement('div');
-bgBlurControl.className = 'blur-control';
-bgBlurControl.innerHTML = `
-    <span class="option-label">Background Blur</span>
-    <input type="range" id="bgBlur" min="0" max="20" value="0">
-    <span class="range-value">0px</span>
-`;
-const bgOptionsContainer = document.querySelector('.background-options');
-if (bgOptionsContainer) {
-    // Append after the background options
-    bgOptionsContainer.parentElement.appendChild(bgBlurControl);
-}
-
-const bgBlurInput = document.getElementById('bgBlur');
-if (bgBlurInput) {
-    bgBlurInput.addEventListener('input', (e) => {
-        const value = e.target.value;
-        e.target.nextElementSibling.textContent = `${value}px`;
-        applyBackgroundClientSide();
-    });
-}
 let processedBlob = null;
 let selectedFiles = [];
 let transparentBlob = null; // Store the transparent PNG
 let currentFormat = 'png';
-let currentQuality = 95;
+let currentQuality = 100;
 let originalImageForRefine = null;
 let processedImageForRefine = null;
 
@@ -460,22 +430,15 @@ if (localStorage.getItem('theme') === 'light') {
 // Background options
 const bgOptions = document.querySelectorAll('input[name="background_type"]');
 const bgColorGroup = document.querySelector('.bg-color-group');
-const bgImageGroup = document.querySelector('.bg-image-group');
 
 bgOptions.forEach(option => {
     option.addEventListener('change', function() {
         if (this.value === 'color') {
             bgColorGroup.style.display = 'block';
-            bgImageGroup.style.display = 'none';
-        } else if (this.value === 'image') {
-            bgColorGroup.style.display = 'none';
-            bgImageGroup.style.display = 'block';
         } else {
             bgColorGroup.style.display = 'none';
-            bgImageGroup.style.display = 'none';
         }
 
-        // Apply background client-side if we have transparent image
         if (transparentBlob && selectedFiles.length > 0) {
             applyBackgroundClientSide();
         }
@@ -518,7 +481,7 @@ if (qualitySlider) {
     });
 }
 
-// Preset backgrounds
+// Preset backgrounds (only if they exist)
 const presetBgs = document.querySelectorAll('.preset-bg');
 let selectedPresetUrl = null;
 
@@ -529,15 +492,17 @@ presetBgs.forEach(preset => {
         selectedPresetUrl = this.dataset.url;
         
         // Clear custom file input when preset is selected
-        document.getElementById('bgImage').value = '';
-        document.querySelector('.file-name').textContent = 'Choose image...';
+        const bgImageEl = document.getElementById('bgImage');
+        if (bgImageEl) bgImageEl.value = '';
+        const fileNameEl = document.querySelector('.file-name');
+        if (fileNameEl) fileNameEl.textContent = 'Choose image...';
 
         if (transparentBlob && selectedFiles.length > 0) {
             applyBackgroundClientSide();
         }
     });
 });
-// Advanced Controls
+// Advanced Controls (with safety checks)
 const superPrecision = document.getElementById('super_precision');
 const autoShadow = document.getElementById('auto_shadow');
 const brightnessSlider = document.getElementById('subject-brightness');
@@ -588,7 +553,7 @@ if (edgeCleaningInput && edgeCleaningVal) {
     });
 }
 
-// Disable background options when Enhancement is active
+// Disable background options when Enhancement is active (if exists)
 const enhanceBgInput = document.getElementById('enhance_bg');
 if (enhanceBgInput) {
     enhanceBgInput.addEventListener('change', function() {
@@ -596,8 +561,11 @@ if (enhanceBgInput) {
         bgOptionInputs.forEach(input => {
             input.disabled = this.checked;
             // Add a visual indicator
-            input.closest('.bg-option').style.opacity = this.checked ? '0.5' : '1';
-            input.closest('.bg-option').style.pointerEvents = this.checked ? 'none' : 'auto';
+            const bgOption = input.closest('.bg-option');
+            if (bgOption) {
+                bgOption.style.opacity = this.checked ? '0.5' : '1';
+                bgOption.style.pointerEvents = this.checked ? 'none' : 'auto';
+            }
         });
         
         if (this.checked) {
@@ -635,19 +603,23 @@ function addComparisonToggle(container, originalSrc, processedSrc) {
     container.appendChild(btn);
 }
 
-// Custom background image change
-document.getElementById('bgImage').addEventListener('change', function(e) {
-    const fileName = e.target.files[0] ? e.target.files[0].name : 'Choose image...';
-    document.querySelector('.file-name').textContent = fileName;
-    
-    // Clear preset selection when custom file is chosen
-    presetBgs.forEach(p => p.classList.remove('selected'));
-    selectedPresetUrl = null;
+// Custom background image change (if bgImage exists)
+const bgImageInput = document.getElementById('bgImage');
+if (bgImageInput) {
+    bgImageInput.addEventListener('change', function(e) {
+        const fileName = e.target.files[0] ? e.target.files[0].name : 'Choose image...';
+        const fileNameEl = document.querySelector('.file-name');
+        if (fileNameEl) fileNameEl.textContent = fileName;
+        
+        // Clear preset selection when custom file is chosen
+        presetBgs.forEach(p => p.classList.remove('selected'));
+        selectedPresetUrl = null;
 
-    if (transparentBlob && selectedFiles.length > 0) {
-        applyBackgroundClientSide();
-    }
-});
+        if (transparentBlob && selectedFiles.length > 0) {
+            applyBackgroundClientSide();
+        }
+    });
+}
 
 // Update applyBackgroundClientSide to handle presets and blur
 async function applyBackgroundClientSide() {
@@ -660,7 +632,10 @@ async function applyBackgroundClientSide() {
     img.onload = function() {
         let width = img.width;
         let height = img.height;
-        const maxSize = parseInt(document.getElementById('max_size').value);
+        const maxSizeEl = document.getElementById('max_size');
+        const maxSize = maxSizeEl ? parseInt(maxSizeEl.value) : 0;
+        
+        // ONLY resize if user explicitly selected a max size, keep original otherwise!
         if (maxSize > 0 && maxSize < Math.max(width, height)) {
             if (width > height) {
                 height = (height * maxSize) / width;
@@ -673,69 +648,22 @@ async function applyBackgroundClientSide() {
         canvas.width = width;
         canvas.height = height;
 
-        // Apply subject lighting adjustments
-        const brightness = (brightnessSlider ? brightnessSlider.value : 100) / 100;
-        const contrast = (contrastSlider ? contrastSlider.value : 100) / 100;
-        const saturation = (saturationSlider ? saturationSlider.value : 100) / 100;
-        
-        ctx.filter = `brightness(${brightness}) contrast(${contrast}) saturate(${saturation})`;
-        
-        // Apply shadow if enabled
-        if (autoShadow && autoShadow.checked) {
-            ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-            ctx.shadowBlur = 15;
-            ctx.shadowOffsetX = 5;
-            ctx.shadowOffsetY = 5;
-        }
-
         ctx.drawImage(img, 0, 0, width, height);
         
-        // Reset filter and shadow
-        ctx.filter = 'none';
-        ctx.shadowColor = 'transparent';
-        ctx.shadowBlur = 0;
-        ctx.shadowOffsetX = 0;
-        ctx.shadowOffsetY = 0;
+        const bgTypeInput = document.querySelector('input[name="background_type"]:checked');
+        const bgType = bgTypeInput ? bgTypeInput.value : 'transparent';
 
-        const bgType = document.querySelector('input[name="background_type"]:checked').value;
-        
-        // Hide/Show blur control
-        if (bgBlurControl) bgBlurControl.classList.toggle('visible', bgType === 'image');
-
-        if (bgType === 'color') {
+        if (bgType === 'white') {
+            ctx.globalCompositeOperation = 'destination-over';
+            ctx.fillStyle = '#ffffff';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            finalizeCanvas();
+        } else if (bgType === 'color' && bgColorInput) {
             const color = bgColorInput.value;
             ctx.globalCompositeOperation = 'destination-over';
             ctx.fillStyle = color;
             ctx.fillRect(0, 0, canvas.width, canvas.height);
             finalizeCanvas();
-        } else if (bgType === 'image') {
-            const bgFile = document.getElementById('bgImage').files[0];
-            
-            if (bgFile || selectedPresetUrl) {
-                const bgImg = new Image();
-                bgImg.crossOrigin = "anonymous"; // Enable CORS for unsplash images
-                bgImg.onload = function() {
-                    // Apply blur to background if needed
-                    const blurValue = parseInt(bgBlurInput?.value || 0);
-                    if (blurValue > 0) {
-                        ctx.filter = `blur(${blurValue}px)`;
-                    }
-                    
-                    ctx.globalCompositeOperation = 'destination-over';
-                    ctx.drawImage(bgImg, 0, 0, canvas.width, canvas.height);
-                    
-                    ctx.filter = 'none'; // Reset filter for foreground
-                    finalizeCanvas();
-                };
-                
-                if (bgFile) {
-                    bgImg.src = URL.createObjectURL(bgFile);
-                } else if (selectedPresetUrl) {
-                    bgImg.src = selectedPresetUrl;
-                }
-            } else {
-                finalizeCanvas();
-            }
         } else {
             finalizeCanvas();
         }
@@ -752,10 +680,72 @@ async function applyBackgroundClientSide() {
             processedBlob = blob;
             const url = URL.createObjectURL(blob);
             resultImg.src = url;
-            showStatus('Options applied successfully!', 'success');
+            showStatus('Background updated!', 'success');
         }, mimeType, quality);
     }
 }
+
+// Auto-detect background color button
+const autoDetectBtn = document.getElementById('autoDetectColor');
+if (autoDetectBtn && selectedFiles.length > 0) {
+    autoDetectBtn.addEventListener('click', async () => {
+        try {
+            const formData = new FormData();
+            formData.append('image', selectedFiles[0]);
+            
+            const backendUrl = window.location.port === '5500' ? 'http://127.0.0.1:5000/detect-background-color' : '/detect-background-color';
+            const response = await fetch(backendUrl, {
+                method: 'POST',
+                body: formData
+            });
+            
+            if (!response.ok) {
+                throw new Error('Failed to detect background color');
+            }
+            
+            const result = await response.json();
+            if (result.success) {
+                bgColorInput.value = result.color;
+                colorPresets.forEach(p => p.classList.remove('selected'));
+                showStatus(`Detected background color: ${result.color}`, 'success');
+                
+                // Apply the detected color if we have a processed image
+                if (transparentBlob && selectedFiles.length > 0) {
+                    applyBackgroundClientSide();
+                }
+            }
+        } catch (error) {
+            console.error('Error detecting background color:', error);
+            showStatus('Failed to detect background color', 'error');
+        }
+    });
+}
+
+// Daily use preset background buttons
+const presetBgBtns = document.querySelectorAll('.preset-bg-btn');
+presetBgBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+        // Select this preset
+        presetBgBtns.forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        
+        // Set the color
+        const color = btn.dataset.color;
+        bgColorInput.value = color;
+        colorPresets.forEach(p => p.classList.remove('selected'));
+        
+        // Select the 'color' background type
+        document.querySelector('input[name="background_type"][value="color"]').checked = true;
+        bgColorGroup.style.display = 'block';
+        
+        // Apply the background if we have a processed image
+        if (transparentBlob && selectedFiles.length > 0) {
+            applyBackgroundClientSide();
+        }
+        
+        showStatus('Applied preset background!', 'success');
+    });
+});
 
 // Set initial selected color
 const initialColor = document.querySelector('.color-preset[data-color="#ffffff"]');
@@ -835,6 +825,46 @@ function handleFiles(files) {
         result.style.display = 'none'; // Hide previous result
         status.textContent = '';
         status.className = 'status';
+        
+        // Re-bind auto-detect button event listener now that we have a file
+        const autoDetectBtn = document.getElementById('autoDetectColor');
+        if (autoDetectBtn) {
+            // Remove existing listeners (if any) by cloning
+            const newBtn = autoDetectBtn.cloneNode(true);
+            autoDetectBtn.parentNode.replaceChild(newBtn, autoDetectBtn);
+            
+            newBtn.addEventListener('click', async () => {
+                try {
+                    const formData = new FormData();
+                    formData.append('image', selectedFiles[0]);
+                    
+                    const backendUrl = window.location.port === '5500' ? 'http://127.0.0.1:5000/detect-background-color' : '/detect-background-color';
+                    const response = await fetch(backendUrl, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    if (!response.ok) {
+                        throw new Error('Failed to detect background color');
+                    }
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        bgColorInput.value = result.color;
+                        colorPresets.forEach(p => p.classList.remove('selected'));
+                        showStatus(`Detected background color: ${result.color}`, 'success');
+                        
+                        // Apply the detected color if we have a processed image
+                        if (transparentBlob && selectedFiles.length > 0) {
+                            applyBackgroundClientSide();
+                        }
+                    }
+                } catch (error) {
+                    console.error('Error detecting background color:', error);
+                    showStatus('Failed to detect background color', 'error');
+                }
+            });
+        }
     } else {
         showStatus('Please select valid image files.', 'error');
     }
@@ -871,43 +901,43 @@ document.getElementById('uploadForm').addEventListener('submit', async function(
         formData.append('quality', quality);
         
         // Auto-detect best settings
-        formData.append('model', 'isnet-general-use'); // High precision default
+        formData.append('model', 'u2net_human_seg'); // Specifically trained for human portraits!
         formData.append('format', 'png'); // PNG default for transparency
         
         const bgTypeInput = document.querySelector('input[name="background_type"]:checked');
         const bgType = bgTypeInput ? bgTypeInput.value : 'transparent';
         formData.append('background_type', bgType);
         
-        const bgColorInput = document.getElementById('bgColor');
-        formData.append('bg_color', bgColorInput ? bgColorInput.value : '#ffffff');
+        const bgColorInputEl = document.getElementById('bgColor');
+        formData.append('bg_color', bgColorInputEl ? bgColorInputEl.value : '#ffffff');
         
-        // Add advanced settings
-        const superPrecision = document.getElementById('super_precision');
-        if (superPrecision) {
-            formData.append('super_precision', superPrecision.checked);
+        // Add advanced settings (if they exist)
+        const superPrecisionEl = document.getElementById('super_precision');
+        if (superPrecisionEl) {
+            formData.append('super_precision', superPrecisionEl.checked);
         }
 
-        const edgeCleaning = document.getElementById('edge_cleaning');
-        if (edgeCleaning) {
-            formData.append('edge_cleaning', edgeCleaning.value);
+        const edgeCleaningEl = document.getElementById('edge_cleaning');
+        if (edgeCleaningEl) {
+            formData.append('edge_cleaning', edgeCleaningEl.value);
         }
 
-        const enhanceBg = document.getElementById('enhance_bg');
-        if (enhanceBg) {
-            formData.append('enhance_bg', enhanceBg.checked);
+        const enhanceBgEl = document.getElementById('enhance_bg');
+        if (enhanceBgEl) {
+            formData.append('enhance_bg', enhanceBgEl.checked);
         }
 
-        const alphaMatting = document.getElementById('alpha_matting');
-        if (alphaMatting) {
-            formData.append('alpha_matting', alphaMatting.checked);
+        const alphaMattingEl = document.getElementById('alpha_matting');
+        if (alphaMattingEl) {
+            formData.append('alpha_matting', alphaMattingEl.checked);
             formData.append('alpha_matting_foreground_threshold', document.getElementById('af_threshold')?.value || '240');
             formData.append('alpha_matting_background_threshold', document.getElementById('ab_threshold')?.value || '10');
             formData.append('alpha_matting_erode_size', document.getElementById('ae_size')?.value || '10');
         }
 
-        const bgImage = document.getElementById('bgImage')?.files[0];
-        if (bgImage) {
-            formData.append('bg_image', bgImage);
+        const bgImageFile = document.getElementById('bgImage')?.files[0];
+        if (bgImageFile) {
+            formData.append('bg_image', bgImageFile);
         }
 
         // Get current settings

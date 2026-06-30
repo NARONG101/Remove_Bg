@@ -3,8 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Background Remover</title>
-    <link rel="stylesheet" href="../static/styles.css">
+    <title>Magic Background Remover</title>
+    <link rel="stylesheet" href="/static/styles.css">
 </head>
 <body>
     <div class="container">
@@ -15,22 +15,108 @@
         </div>
         <button class="theme-toggle" id="themeToggle" title="Toggle Theme">☀️</button>
         <div class="left-panel">
-            <h1>Background Remover</h1>
+            <h1>✨ Background Remover</h1>
             <form id="uploadForm" enctype="multipart/form-data">
                 <div class="upload-area" id="uploadArea">
-                    <button class="paste-btn" id="pasteBtn" type="button">Paste Image</button>
+                    <div class="upload-icon">📸</div>
+                    <button class="primary-upload-btn" id="primaryUploadBtn" type="button">
+                        <span>Choose Image</span>
+                    </button>
+                    <button class="paste-btn" id="pasteBtn" type="button">
+                        📋 Paste Image
+                    </button>
                     <input type="file" name="files" accept="image/*" id="fileInput" multiple required>
-                    <div class="upload-text">Drop your images here or click to browse</div>
-                    <div class="upload-subtext">Supports PNG, JPG, JPEG, WebP up to 10MB each</div>
+                    <div class="upload-text">Or drag and drop your images here</div>
+                    <div class="upload-subtext">PNG, JPG, WebP • Max 10MB</div>
                     <div class="file-count" id="fileCount"></div>
                     <div class="preview" id="preview">
                         <img id="previewImg" alt="Preview">
                     </div>
                 </div>
+                <div class="options">
+                    <div class="option-group">
+                        <span class="option-label">Max Size</span>
+                        <select id="max_size" name="max_size" class="size-select">
+                            <option value="0" selected>Original Size</option>
+                            <option value="1920">Full HD (1920px)</option>
+                            <option value="1280">Large (1280px)</option>
+                            <option value="800">Medium (800px)</option>
+                        </select>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Background Style:</label>
+                        <div class="background-options">
+                            <label class="bg-option" title="Transparent Background">
+                                <input type="radio" name="background_type" value="transparent" checked>
+                                <div class="bg-card">
+                                    <span class="bg-icon">🏁</span>
+                                    <span class="bg-label">Transparent</span>
+                                </div>
+                            </label>
+                            <label class="bg-option" title="White Background (ID Photo)">
+                                <input type="radio" name="background_type" value="white">
+                                <div class="bg-card">
+                                    <span class="bg-icon">📸</span>
+                                    <span class="bg-label">ID Photo</span>
+                                </div>
+                            </label>
+                            <label class="bg-option" title="Solid Color Background">
+                                <input type="radio" name="background_type" value="color">
+                                <div class="bg-card">
+                                    <span class="bg-icon">🎨</span>
+                                    <span class="bg-label">Custom</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+                    <div class="option-group bg-color-group" style="display: none;">
+                        <div class="auto-detect-container">
+                            <button type="button" id="autoDetectColor" class="auto-detect-btn">
+                                <span class="btn-icon">🔍</span>
+                                Auto-Detect Original Background
+                            </button>
+                        </div>
+                        <div class="color-presets">
+                            <button type="button" class="color-preset" data-color="#ffffff" style="background: #ffffff;" title="White"></button>
+                            <button type="button" class="color-preset" data-color="#000000" style="background: #000000;" title="Black"></button>
+                            <button type="button" class="color-preset" data-color="#4299e1" style="background: #4299e1;" title="Blue"></button>
+                            <button type="button" class="color-preset" data-color="#f6ad55" style="background: #f6ad55;" title="Orange"></button>
+                            <button type="button" class="color-preset" data-color="#68d391" style="background: #68d391;" title="Green"></button>
+                            <button type="button" class="color-preset" data-color="#ff69b4" style="background: #ff69b4;" title="Pink"></button>
+                            <button type="button" class="color-preset" data-color="#9370db" style="background: #9370db;" title="Purple"></button>
+                            <button type="button" class="color-preset" data-color="#ffd700" style="background: #ffd700;" title="Gold"></button>
+                        </div>
+                        <div class="custom-color-input">
+                            <input type="color" id="bgColor" name="bg_color" value="#ffffff">
+                            <span>Pick Color</span>
+                        </div>
+                    </div>
+                    <div class="option-group">
+                        <label class="option-label">Daily Use Presets:</label>
+                        <div class="preset-backgrounds">
+                            <button type="button" class="preset-bg-btn" data-color="#e6f7ff" title="Light Blue - Product Photo">
+                                <span class="preset-icon">🛍️</span>
+                                <span class="preset-label">Product</span>
+                            </button>
+                            <button type="button" class="preset-bg-btn" data-color="#f0f9eb" title="Light Green - Profile Photo">
+                                <span class="preset-icon">👤</span>
+                                <span class="preset-label">Profile</span>
+                            </button>
+                            <button type="button" class="preset-bg-btn" data-color="#fff7e6" title="Warm Orange - Social Media">
+                                <span class="preset-icon">📱</span>
+                                <span class="preset-label">Social</span>
+                            </button>
+                            <button type="button" class="preset-bg-btn" data-color="#f5f5f5" title="Gray - Resume Photo">
+                                <span class="preset-icon">📄</span>
+                                <span class="preset-label">Resume</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <div class="submit-container">
                     <button type="submit" id="submitBtn">
                         <span class="btn-icon">✨</span>
-                        Magic Remove Background
+                        Remove Background
                     </button>
                 </div>
             </form>
@@ -44,7 +130,7 @@
                 </div>
             </div>
             <div class="result" id="result">
-                <h3 id="resultTitle">Processed Result</h3>
+                <h3 id="resultTitle">Your Result ✨</h3>
                 <div class="result-container">
                     <img id="resultImg" alt="Processed image" class="result-image">
                 </div>
@@ -54,7 +140,7 @@
                         Download
                     </button>
                     <button id="refineBtn" class="refine-btn">
-                        <span class="btn-icon">🖌️</span> Manual Refine
+                        <span class="btn-icon">🖌️</span> Edit
                     </button>
                 </div>
 
@@ -62,21 +148,21 @@
                 <div id="refineModal" class="modal">
                     <div class="modal-content">
                         <div class="modal-header">
-                            <h2>🖌️ Manual Refinement</h2>
+                            <h2>🖌️ Edit Image</h2>
                             <button class="close-modal">&times;</button>
                         </div>
                         <div class="modal-body">
                             <div class="editor-toolbar">
                                 <div class="brush-type">
-                                    <button id="brushRestore" class="tool-btn active" title="Restore original image (Smart Mode: Selects similar colors)">
+                                    <button id="brushRestore" class="tool-btn active" title="Restore original image">
                                         <span class="icon">✨</span> Restore
                                     </button>
-                                    <button id="brushRemove" class="tool-btn" title="Remove part of image (Smart Mode: Selects similar colors)">
+                                    <button id="brushRemove" class="tool-btn" title="Remove part of image">
                                         <span class="icon">🧽</span> Erase
                                     </button>
                                 </div>
                                 <div class="smart-toggle">
-                                    <label class="checkbox-label" title="Automatically select and apply to similar colors when clicking">
+                                    <label class="checkbox-label" title="Automatically select similar colors">
                                         <input type="checkbox" id="smartSelection" checked>
                                         🪄 Smart Mode
                                     </label>
@@ -95,7 +181,7 @@
                                 </div>
                                 <div class="editor-actions">
                                     <button id="undoRefine" class="tool-btn" title="Undo last action (Ctrl+Z)">↩️ Undo</button>
-                                    <button id="saveRefine" class="save-btn">✅ Apply & Save</button>
+                                    <button id="saveRefine" class="save-btn">✅ Done</button>
                                 </div>
                             </div>
                             <div class="canvas-container" id="canvasContainer">
@@ -106,60 +192,10 @@
                         </div>
                     </div>
                 </div>
-                <div class="options">
-                    <div class="option-group">
-                        <span class="option-label">Max Size</span>
-                        <select id="max_size" name="max_size" class="size-select">
-                            <option value="0">Original Size</option>
-                            <option value="1920">Full HD (1920px)</option>
-                            <option value="1280" selected>Large (1280px)</option>
-                            <option value="800">Medium (800px)</option>
-                            <option value="500">Small (500px)</option>
-                        </select>
-                    </div>
-                    <div class="option-group">
-                        <span class="option-label">Quality</span>
-                        <input type="range" id="quality" name="quality" min="10" max="100" value="95">
-                    </div>
-
-
-                    <div class="option-group">
-                        <label class="option-label">Background Style:</label>
-                        <div class="background-options">
-                            <label class="bg-option" title="Transparent Background">
-                                <input type="radio" name="background_type" value="transparent" checked>
-                                <div class="bg-card">
-                                    <span class="bg-icon">🏁</span>
-                                    <span class="bg-label">Transparent</span>
-                                </div>
-                            </label>
-                            <label class="bg-option" title="Solid Color Background">
-                                <input type="radio" name="background_type" value="color">
-                                <div class="bg-card">
-                                    <span class="bg-icon">🎨</span>
-                                    <span class="bg-label">Solid Color</span>
-                                </div>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div class="option-group bg-color-group" style="display: none;">
-                        <label class="option-label">Select Color:</label>
-                        <div class="color-presets">
-                            <button type="button" class="color-preset" data-color="#ffffff" style="background: #ffffff;" title="White"></button>
-                            <button type="button" class="color-preset" data-color="#000000" style="background: #000000;" title="Black"></button>
-                            <button type="button" class="color-preset" data-color="#4299e1" style="background: #4299e1;" title="Blue"></button>
-                        </div>
-                        <div class="custom-color-input">
-                            <input type="color" id="bgColor" name="bg_color" value="#ffffff">
-                            <span>Custom Color</span>
-                        </div>
-                    </div>
-                </div>
             </div>
             <div class="status" id="status"></div>
         </div>
     </div>
-    <script src="../static/script.js"></script>
+    <script src="/static/script.js"></script>
 </body>
 </html>
